@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>VK API</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #fce4ec; /* Светло-розовый фон */
+      margin: 0;
+      padding: 0;
+    }
+    .header {
+      background: #d81b60; /* Ярко-розовый заголовок */
+      color: white;
+      text-align: center;
+      padding: 20px;
+      border-bottom: 5px solid #c51162; /* Темно-розовая рамка */
+    }
+    .container {
+      max-width: 800px;
+      margin: 30px auto;
+      padding: 20px;
+      background: #ffffff; /* Белый фон для контейнера */
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+    .input-group {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #f48fb1; /* Светло-розовая рамка */
+      border-radius: 8px;
+      background: #f8bbd0; /* Светло-розовый фон для групп */
+    }
+    input, textarea {
+      width: calc(100% - 24px); /* Учитываем отступы */
+      padding: 12px;
+      margin: 8px 0;
+      border: 2px solid #d81b60; /* Ярко-розовая рамка */
+      border-radius: 6px;
+      transition: border-color 0.3s;
+      box-sizing: border-box; /* Учитываем рамки и отступы */
+    }
+    input:focus, textarea:focus {
+      border-color: #c51162; /* Темнее при фокусе */
+    }
+    button {
+      background: #ff4081; /* Ярко-розовая кнопка */
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      cursor: pointer;
+      border-radius: 6px;
+      font-weight: bold;
+      transition: background 0.3s, transform 0.3s;
+      margin-top: 10px; /* Отступ сверху */
+    }
+    button:hover {
+      background: #f50057; /* Темнее при наведении */
+      transform: scale(1.05); /* Увеличение при наведении */
+    }
+    .status {
+      margin: 15px 0;
+      padding: 12px;
+      background: #f8bbd0; /* Светло-розовый фон для статуса */
+      border: 1px solid #f48fb1; /* Светло-розовая рамка */
+      border-radius: 6px;
+      color: #d81b60; /* Ярко-розовый текст */
+    }
+    footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 0.9em;
+      color: white;
+      padding: 10px;
+      background: #d81b60; /* Ярко-розовый подвал */
+      border-radius: 0 0 12px 12px;
+    }
+  </style>
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>VK API Инструменты</h1>
+  </div>
+  <div class="container">
+  <div class="input-group">
+    <h3>Авторизация</h3>
+    <input type="text" id="manualToken" placeholder="Введите access token">
+    <button onclick="setToken()">Войти</button>
+  </div>
+
+  <button onclick="authVK()">Авторизоваться через ВКонтакте</button>
+  <div class="status" id="status"></div>
+
+  <div class="input-group">
+    <h3>Создать пост</h3>
+    <input type="text" id="userId" placeholder="ID пользователя">
+    <textarea id="postText" placeholder="Текст поста"></textarea>
+    <button onclick="createPost()">Опубликовать</button>
+  </div>
+
+  <div class="input-group">
+    <h3>Комментарий к посту</h3>
+    <input type="text" id="postId" placeholder="ID поста (формат: owner_id_post_id)">
+    <textarea id="commentText" placeholder="id стикера"></textarea>
+    <button onclick="addComment()">Добавить комментарий</button>
+  </div>
+
+  <div class="input-group">
+    <h3>Лайк на публикацию</h3>
+    <input type="text" id="likePostId" placeholder="ID поста (формат: owner_id_post_id)">
+    <button onclick="likePost()">Лайкнуть</button>
+  </div>
+</div>
+
+<script>
+  const APP_ID = 53118560;
+  let accessToken = null;
+
+  function setToken() {
+    accessToken = document.getElementById('manualToken').value.trim();
+
+    if(accessToken) {
+      document.getElementById('status').innerHTML = 'Авторизация успешна';
+    } else {
+      document.getElementById('status').innerHTML = 'Введите аксес токен в поле выше';
+    }
+  }
+
+  function authVK() {
+    const redirectUri = "https://oauth.vk.com/blank.html";
+    const scope = ["wall"];
+    const url = new URL(`https://oauth.vk.com/authorize?client_id=${APP_ID}&display=page&redirect_uri=${redirectUri}&scope=${scope}&response_type=token&v=5.199`);
+    const authWindow = window.open(
+      url.href,
+      'VK Auth',
+      'width=600,height=700'
+    );
+  }
+
+  function callAPI(method, params) {
+    return $.ajax({
+      url: `https://api.vk.com/method/${method}`,
+      data: {
+        ...params,
+        access_token: accessToken,
+        v: '5.199'
+      },
+      dataType: 'jsonp',
+      jsonp: 'callback'
+    });
+  }
+
+  function createPost() {
+    const ownerId = $('#userId').val() || '';
+    const message = $('#postText').val();
+
+    callAPI('wall.post', {
+      owner_id: ownerId,
+      message: message,
+      privacy_view: 'friends'
+    })
+    .done(function(response) {
+      handleResponse(response, 'Пост успешно опубликован');
+    })
+    .fail(function(jqXHR) {
+      handleError(jqXHR);
+    });
+  }
+
+  function addComment() {
+    const [ownerId, postId] = $('#postId').val().split('_');
+    const message = $('#commentText').val();
+
+    callAPI('wall.createComment', {
+      owner_id: ownerId,
+      post_id: postId,
+      //message: message,
+      sticker_id: 1
+    })
+    .done(function(response) {
+      handleResponse(response, 'Комментарий добавлен');
+    })
+    .fail(handleError);
+  }
+
+  function likePost() {
+    const [ownerId, postId] = $('#likePostId').val().split('_');
+
+    callAPI('likes.add', {
+      type: 'post',
+      owner_id: ownerId,
+      item_id: postId
+    })
+    .done(function(response) {
+      handleResponse(response, 'Лайк поставлен');
+    })
+    .fail(handleError);
+  }
+
+  function handleResponse(response, successMsg) {
+    if(response.response) {
+      alert(successMsg);
+    } else {
+      alert('Ошибка: ' + (response.error?.error_msg || 'Неизвестная ошибка'));
+    }
+  }
+
+  function handleError(jqXHR) {
+    alert('Ошибка запроса: ' + (jqXHR.responseJSON?.error?.error_msg || 'Ошибка сети'));
+  }
+</script>
+</body>
+</html>
